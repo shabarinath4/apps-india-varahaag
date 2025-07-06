@@ -1,0 +1,110 @@
+malawi_250617_bt:
+  path: "data/train_ready/malawi_250617_bt"
+  data_file: "data.npy"
+  ids_file: "ids.npy"
+  labels_file: "labels.npy"
+  meta_file: "harmonized_malawi_3857_revised.shp"
+  cld_model_file: cloud_mask_rf.pkl
+  plot_level_train: true
+  total_ts: 27
+  ts_slice_width: 27
+  ts_step: 1
+  years: [2022, 2023]
+  crops_to_drop: []
+  outlier_per_timestamp: false
+  normalise_strategy: "IQR"
+  band_name_map:
+    coastal_blue_median: COASTALBLUE
+    blue_median: B2
+    green_i_median: GREENI
+    green_median: B3
+    yellow_median: YELLOW
+    red_median: B4
+    rededge_median: REDEDGE
+    nir_median: B8
+    alpha_median: ALPHA
+
+malawi_250617_ft:
+  path: "data/train_ready/malawi_250617_ft"
+  data_file: "data.npy"
+  ids_file: "ids.npy"
+  labels_file: "labels.npy"
+  meta_file: "harmonized_malawi_3857_revised.shp"
+  cld_model_file: cloud_mask_rf.pkl
+  plot_level_train: true
+  total_ts: 27
+  ts_slice_width: 27
+  ts_step: 1
+  years: [2022, 2023]
+  crops_to_drop: []
+  outlier_per_timestamp: false
+  normalise_strategy: "IQR"
+  band_name_map:
+    coastal_blue_median: COASTALBLUE
+    blue_median: B2
+    green_i_median: GREENI
+    green_median: B3
+    yellow_median: YELLOW
+    red_median: B4
+    rededge_median: REDEDGE
+    nir_median: B8
+    alpha_median: ALPHA
+
+shared_base_config: &base_config
+  UID: '.geo'
+  label_columns: ['crop_name', 'cropname']
+  plot_level_train: true
+  total_ts: 16
+  ts_slice_idx: [8, 16]
+  remove_bands: ["B1", "B10"]
+  crops_to_drop: []
+  min_sample_per_class: 5
+  group_crops: true
+  crops_to_keep: ["paddy_(transplanting)", "paddy_(dsr)", "cotton"]
+  outlier_per_timestamp: false
+  normalise_strategy: "IQR"
+  band_name_map:
+    'VH_dB': 'VH_dB'
+    'VV_dB': 'VV_dB'
+    'B2': 'B2' 
+    'B3': 'B3' 
+    'B4': 'B4' 
+    'B5': 'B5' 
+    'B6': 'B6' 
+    'B7': 'B7' 
+    'B8': 'B8' 
+    'B8A': 'B8A' 
+    'B9': 'B9' 
+    'B11': 'B11' 
+    'B12': 'B12'
+    'REP': 'REP'
+  VIs: {"NDVI":[8, 4]}
+  EXP_VER: "99"
+  MODEL_TYPE: "fsl"
+  model_dir_bt: null
+  batch_size: 64
+  bt_epochs: 1
+  ft_epochs: 1
+  min_delta: 0.0001
+  patience: 10
+  use_pretrained_model: false
+  k_shot_value: [1, 5, 10, 'all']
+  ORIGINAL_INTERVAL_DAYS: 20
+  TARGET_INTERVAL_DAYS: 10
+  MASK_VALUE: !!float .nan
+  comb_per_sample: 10
+  resample_data: true
+
+india_250620_bt:
+  <<: *base_config
+  path: "data/train_ready/india_250620_bt"
+
+india_250620_ft:
+  <<: *base_config
+  path: "data/train_ready/india_250620_ft"
+
+india_250620_inf_in:
+  <<: *base_config
+  path: "data/train_ready/india_250620_inf_in"
+  results_dir: 'results/trials/fsl/99_fsl_20250706-233404_554d0145-3798-41c3-93f6-90a3ec1db4f3'
+  model_dir: 'saved_models/trials/fsl/99_fsl_20250706-233404_554d0145-3798-41c3-93f6-90a3ec1db4f3'
