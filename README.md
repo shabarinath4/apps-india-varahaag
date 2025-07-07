@@ -1,5 +1,5 @@
 **Train**
-python main_run.py --bt_path_ids india_250620_bt --ft_path_ids india_250620_ft
+'''python main_run.py --bt_path_ids india_250620_bt --ft_path_ids india_250620_ft'''
 To train base model and fine tuned model sequentially
 
 python main_run.py --bt_path_ids india_250620_bt 
