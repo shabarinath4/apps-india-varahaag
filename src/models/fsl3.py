@@ -81,53 +81,53 @@ class Train:
         self.COMB_PER_SAMPLE = COMB_PER_SAMPLE
         self.training_params = training_params
 
-    # def create_base_network(self, input_shape: Tuple[int, int]) -> Model:
-    #     """
-    #     Builds the embedding model using Conv1D + Temporal Pyramid Pooling.
-
-    #     Parameters
-    #     ----------
-    #     input_shape : Tuple[int, int]
-    #         Shape of the input data (time, features)
-
-    #     Returns
-    #     -------
-    #     keras.Model : Compiled embedding model
-    #     """
-    #     inp = Input(shape=input_shape)
-    #     x = Lambda(lambda t: tf.squeeze(t, axis=-1))(inp)           # Remove last channel if it's 1
-    #     x = Conv1D(16, 3, activation='relu', padding='same')(x)
-    #     x = Conv1D(32, 3, activation='relu', padding='same')(x)
-    #     x = Conv1D(64, 3, activation='relu', padding='same')(x)
-    #     x = TemporalPyramidPooling(pyramid_levels=[1, 3, 5, 7])(x)
-    #     x = Dense(32, activation='relu')(x)
-    #     x = Lambda(lambda t: tf.math.l2_normalize(t, axis=1))(x)    # L2 normalize embeddings
-    #     print('Running temporal independent')
-    #     return Model(inp, x)
-
     def create_base_network(self, input_shape: Tuple[int, int]) -> Model:
-            """
-            Builds the embedding model using Conv1D + Temporal Pyramid Pooling.
+        """
+        Builds the embedding model using Conv1D + Temporal Pyramid Pooling.
 
-            Parameters
-            ----------
-            input_shape : Tuple[int, int]
-                Shape of the input data (time, features)
+        Parameters
+        ----------
+        input_shape : Tuple[int, int]
+            Shape of the input data (time, features)
 
-            Returns
-            -------
-            keras.Model : Compiled embedding model
-            """
-            input = Input(shape=input_shape)
-            x = Conv1D(16, (3), activation='relu', padding='same')(input)  
-            x = MaxPooling2D(pool_size=(1, 1))(x)
-            x = Conv1D(32, (3), activation='relu', padding='same')(x)  
-            x = MaxPooling2D(pool_size=(1, 1))(x)
-            x = Conv1D(64, (3), activation='relu', padding='same')(x)  
-            x = MaxPooling2D(pool_size=(1, 1))(x)
-            x = Flatten()(x)  
-            x = Dense(32, activation='sigmoid')(x)  
-            return Model(input, x)
+        Returns
+        -------
+        keras.Model : Compiled embedding model
+        """
+        inp = Input(shape=input_shape)
+        x = Lambda(lambda t: tf.squeeze(t, axis=-1))(inp)           # Remove last channel if it's 1
+        x = Conv1D(16, 3, activation='relu', padding='same')(x)
+        x = Conv1D(32, 3, activation='relu', padding='same')(x)
+        x = Conv1D(64, 3, activation='relu', padding='same')(x)
+        x = TemporalPyramidPooling(pyramid_levels=[1, 3, 5, 7])(x)
+        x = Dense(32, activation='relu')(x)
+        x = Lambda(lambda t: tf.math.l2_normalize(t, axis=1))(x)    # L2 normalize embeddings
+        print('Running temporal independent')
+        return Model(inp, x)
+
+    # def create_base_network(self, input_shape: Tuple[int, int]) -> Model:
+    #         """
+    #         Builds the embedding model using Conv1D + Temporal Pyramid Pooling.
+
+    #         Parameters
+    #         ----------
+    #         input_shape : Tuple[int, int]
+    #             Shape of the input data (time, features)
+
+    #         Returns
+    #         -------
+    #         keras.Model : Compiled embedding model
+    #         """
+    #         input = Input(shape=input_shape)
+    #         x = Conv1D(16, (3), activation='relu', padding='same')(input)  
+    #         x = MaxPooling2D(pool_size=(1, 1))(x)
+    #         x = Conv1D(32, (3), activation='relu', padding='same')(x)  
+    #         x = MaxPooling2D(pool_size=(1, 1))(x)
+    #         x = Conv1D(64, (3), activation='relu', padding='same')(x)  
+    #         x = MaxPooling2D(pool_size=(1, 1))(x)
+    #         x = Flatten()(x)  
+    #         x = Dense(32, activation='sigmoid')(x)  
+    #         return Model(input, x)
 
     def triplet_model(
         self, 
@@ -492,7 +492,7 @@ class Train:
                             history = model.fit(
                                 [a, p, n], np.zeros(len(a)),
                                 batch_size=batch_size,
-                                epochs=epoch,
+                                epochs=1,
                                 verbose=1,
                                 validation_data=val_data,
                                 callbacks=[early_stopping]
@@ -525,7 +525,7 @@ class Train:
                         history = model.fit(
                             [a, p, n], np.zeros(len(a)),
                             batch_size=batch_size,
-                            epochs=epoch,
+                            epochs=1,
                             verbose=1,
                             validation_data=val_data,
                             callbacks=[early_stopping]
@@ -606,7 +606,7 @@ class Train:
                 model.fit(
                     [a, p, n], np.zeros(len(a)),
                     batch_size=batch_size,
-                    epochs=epoch,
+                    epochs=1,
                     verbose=1,
                     validation_data=val_data,
                     callbacks=[early_stopping]

@@ -186,7 +186,7 @@ def make_ml_ready(
 
         id_train, id_test = train_test_split(
             id_list,
-            test_size=0.3,
+            test_size=0.05,
             random_state=1,
             stratify=label_list if len(np.unique(label_list)) > 1 else None
         )

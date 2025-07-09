@@ -12,11 +12,13 @@ base_path = Path(os.getcwd())
 def parse_arguments():
     parser = argparse.ArgumentParser(prog='DeCIFR', description='Crop Type Mapper')
     parser.add_argument('--path_ids', type=str, default=['india_250620_ft'])
+    parser.add_argument('--model_type', type=str, default='base')
     parser.add_argument('--inf_in', type=str, default='india_250620_inf_in')
     parser.add_argument('--inf_out', type=str, default='india_250620_inf_out')
     return parser.parse_args()
 
 args = parse_arguments()
+model_type = getattr(args, 'model_type', 'base')
 inf_in = getattr(args, 'inf_in', 'india_250620_inf_in')
 inf_out = getattr(args, 'inf_out', 'india_250620_inf_out')
 mode = 'inference'
@@ -48,6 +50,7 @@ inf_obj = VarahaIndia(
     )
 
 inf_obj.deploy_Varaha_S1_S2_fsl(
+    model_type,
     inf_in_path,
     inf_out_path
 )

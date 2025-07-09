@@ -170,17 +170,18 @@ def train_model(**kwargs):
         idx_train_bt, idx_test_bt = make_ml_ready(X_bt, y_bt, ids_all, features_bt, use_3d)
 
         # Sample data
-        log.info(f"Before sampling:")
-        log.info(f"{pd.Series(y_train_bt).value_counts()}")
-        X_train_input_bt, X_train_3d_bt, X_train_model_bt, y_train_bt = sample_multiple(
-            [X_train_input_bt, X_train_3d_bt, X_train_model_bt],
-            y_train_bt,
-            sampling_technique='Resample',
-            sampling_mode='fixed',
-            n=500
-        )
-        log.info(f"Post sampling:")
-        log.info(f"{pd.Series(y_train_bt).value_counts()}")
+        if resample_data:
+            log.info(f"Before sampling:")
+            log.info(f"{pd.Series(y_train_bt).value_counts()}")
+            X_train_input_bt, X_train_3d_bt, X_train_model_bt, y_train_bt = sample_multiple(
+                [X_train_input_bt, X_train_3d_bt, X_train_model_bt],
+                y_train_bt,
+                sampling_technique='Resample',
+                sampling_mode='fixed',
+                n=500
+            )
+            log.info(f"Post sampling:")
+            log.info(f"{pd.Series(y_train_bt).value_counts()}")
         label_mapping = dict(zip(le_bt.transform(le_bt.classes_), le_bt.classes_))
 
         # Plot signatures
@@ -270,7 +271,19 @@ def train_model(**kwargs):
             link_to_bt_test_idx=idx_test_bt,
             idx=None
         )
-
+        # Sample data
+        if resample_data:
+            log.info(f"Before sampling:")
+            log.info(f"{pd.Series(y_train_ft).value_counts()}")
+            X_train_input_ft, X_train_3d_ft, X_train_model_ft, y_train_ft = sample_multiple(
+                [X_train_input_ft, X_train_3d_ft, X_train_model_ft],
+                y_train_ft,
+                sampling_technique='Resample',
+                sampling_mode='fixed',
+                n=500
+            )
+            log.info(f"Post sampling:")
+            log.info(f"{pd.Series(y_train_ft).value_counts()}")
         label_mapping = dict(zip(le_ft.transform(le_ft.classes_), le_ft.classes_))
         
         # Plot clusters for visualization
