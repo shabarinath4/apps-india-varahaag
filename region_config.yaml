@@ -106,5 +106,5 @@ india_250620_ft:
 india_250620_inf_in:
   <<: *base_config
   path: "data/train_ready/india_250620_inf_in"
-  results_dir: 'results/trials/fsl/99_fsl_20250706-233404_554d0145-3798-41c3-93f6-90a3ec1db4f3'
-  model_dir: 'saved_models/trials/fsl/99_fsl_20250706-233404_554d0145-3798-41c3-93f6-90a3ec1db4f3'
+  results_dir: 'results/trials/fsl/99_fsl_20250707-145601_111d77b5-f137-47cf-b098-09a2963c82de'
+  model_dir: 'saved_models/trials/fsl/99_fsl_20250707-145601_111d77b5-f137-47cf-b098-09a2963c82de'
