@@ -235,13 +235,9 @@ class VarahaIndia:
         data, outlier_dict, normalise_dict = preprocess.prep(self.OUTLIER_PER_TIMESTAMP, self.mask_value)
         logger.info("Preprocessing complete")
         
-        # resampling
-        t0 = time.time()
-        logger.info(f"Resampling")
-        data = preprocess.resample_time_series(data, self.ORIGINAL_INTERVAL_DAYS, self.TARGET_INTERVAL_DAYS)
-        t1 = time.time()
-        logger.info(f"Resampling took {t1 - t0:.2f} seconds")
-        data = np.expand_dims(data, axis=-1)
+        # # resampling
+        # logger.info(f"Resampling")
+        # data = preprocess.resample_time_series(data, self.ORIGINAL_INTERVAL_DAYS, self.TARGET_INTERVAL_DAYS)
         
         # select final bands and timestamps
         data = data[:, :, self.FEATURES_IDX]
@@ -383,12 +379,12 @@ class VarahaIndia:
         logger.info(f"Preprocessing took {t1 - t0:.2f} seconds")
         
         # resampling
-        t0 = time.time()
-        logger.info(f"Resampling")
-        data = preprocess.resample_time_series(data, self.ORIGINAL_INTERVAL_DAYS, self.TARGET_INTERVAL_DAYS)
-        t1 = time.time()
-        logger.info(f"Resampling took {t1 - t0:.2f} seconds")
-        data = np.expand_dims(data, axis=-1)
+        # t0 = time.time()
+        # logger.info(f"Resampling")
+        # data = preprocess.resample_time_series(data, self.ORIGINAL_INTERVAL_DAYS, self.TARGET_INTERVAL_DAYS)
+        # t1 = time.time()
+        # logger.info(f"Resampling took {t1 - t0:.2f} seconds")
+        # data = np.expand_dims(data, axis=-1)
     
         # select bands and timestamps
         data = data[:, :, self.FEATURES_IDX]
