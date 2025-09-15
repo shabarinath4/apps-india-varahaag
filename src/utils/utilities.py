@@ -14,11 +14,15 @@ import colorsys
 import pacmap
 import numpy as np
 import pandas as pd
+import itertools
+import matplotlib.pyplot as plt
+import pacmap
 from sklearn.metrics import silhouette_score, silhouette_samples
 
 from shapely.geometry import shape
 from sklearn.metrics import silhouette_score
 from sklearn.metrics import silhouette_samples
+
 
 class FileOperations(object):
     def __init__(self) -> None:
@@ -33,62 +37,70 @@ class FileOperations(object):
         return file_list
     
 class VisualiseModelEmbeddings(object):
-    def __init__(self, RESULTS_DIR, FIG_NAME_IN, FIG_NAME_OUT, model, X_train, y_train, label_mapping, trained_embeddings):
+    def __init__(self, RESULTS_DIR, X_train, trained_embeddings, X_test, test_embeddings, label_mapping, y_train, y_test, y_pred):
         self.RESULTS_DIR = RESULTS_DIR
-        self.FIG_NAME_IN = FIG_NAME_IN
-        self.FIG_NAME_OUT = FIG_NAME_OUT
-        self.model = model
         self.X_train = X_train
-        self.y_train = y_train
-        self.label_mapping = label_mapping
         self.trained_embeddings = trained_embeddings
+        self.X_test = X_test
+        self.test_embeddings = test_embeddings
+        self.label_mapping = label_mapping
+        self.y_train = y_train
+        self.y_test = y_test
+        self.y_pred = y_pred
 
-    def pacplots(self, data, file_name, title):
+    def pacplots(self, plot_folder):
         def generate_color_dict(n, seed=4):
             np.random.seed(seed)
             hues = np.linspace(0, 1, n)
             saturations = np.linspace(0.7, 1.0, n)
             values = np.linspace(0.5, 1.0, n)
             colors = [colorsys.hsv_to_rgb(hues[i], saturations[i], values[i]) for i in range(n)]
-            color_dict = {i: colors[i] for i in range(n)}
-            return color_dict
+            return {i: colors[i] for i in range(n)}
 
         categories = pd.DataFrame(self.y_train).value_counts().index.tolist()
         categories = [int(c[0]) for c in categories]
         color_dict = generate_color_dict(len(set(self.y_train)))
 
-        embedding = pacmap.PaCMAP(n_components=2, n_neighbors=5, MN_ratio=0.5, FP_ratio=3.0)
-        X_transformed = embedding.fit_transform(data, init="pca")
+        param_combinations = list(itertools.product([5, 10], [0.5, 1.0], [2.0, 3.0]))[:6]
+        total_samples = len(self.X_train)
 
-        plt.figure(figsize=(6, 6))
-        for category in categories:
-            plt.scatter(
-                X_transformed[self.y_train == category, 0],
-                X_transformed[self.y_train == category, 1],
-                color=color_dict[category],
-                label=f'{self.label_mapping[category]}',
-                s=4,
-                alpha=0.7
-            )
-        plt.title(title)
-        plt.legend()
-        plt.savefig(file_name, format='pdf', bbox_inches="tight")
-        plt.close()
-
-        fig_legend = plt.figure(figsize=(2, 2))
-        ax = fig_legend.add_subplot(111)
-        ax.axis('off')
-        handles, labels = plt.gca().get_legend_handles_labels()
-        legend = fig_legend.legend(handles, labels, loc='center', frameon=False)
-        legend_file_name = str(file_name).replace('.pdf', '_legend.pdf')
-        fig_legend.savefig(legend_file_name, bbox_inches='tight')
-        plt.close(fig_legend)
+        for i, (n_neighbors, mn_ratio, fp_ratio) in enumerate(param_combinations):
+            datasets = [
+                (self.X_train, self.y_train, os.path.join(plot_folder, f'xtrain_{i+1}.pdf')),
+                (self.trained_embeddings, self.y_train, os.path.join(plot_folder, f'train_embeddings_{i+1}.pdf')),
+                (self.X_test.reshape(self.X_test.shape[0], -1), self.y_test, os.path.join(plot_folder, f'xtest_{i+1}.pdf')),
+                (self.test_embeddings, self.y_test, os.path.join(plot_folder, f'test_embeddings_{i+1}.pdf')),
+                (self.test_embeddings, self.y_pred, os.path.join(plot_folder, f'pred_embeddings_{i+1}.pdf'))
+            ]
+            
+            for data, labels, fname in datasets:
+                embedding = pacmap.PaCMAP(
+                    n_components=2,
+                    n_neighbors=n_neighbors,
+                    MN_ratio=mn_ratio,
+                    FP_ratio=fp_ratio
+                )
+                X_transformed = embedding.fit_transform(data, init="pca")
+                plt.figure(figsize=(6, 6))
+                for category in categories:
+                    plt.scatter(
+                        X_transformed[labels == category, 0],
+                        X_transformed[labels == category, 1],
+                        color=color_dict[category],
+                        label=self.label_mapping[category],
+                        s=4,
+                        alpha=0.7
+                    )
+                plt.title(f'PaCMAP (n={n_neighbors}, MN={mn_ratio}, FP={fp_ratio})\nTotal Samples: {total_samples}')
+                plt.legend()
+                plt.savefig(fname, format='pdf', bbox_inches="tight")
+                plt.close()
 
     def pacmap(self):
-        if not os.path.exists(os.path.join(self.RESULTS_DIR, "plots\\")):
-            os.makedirs(os.path.join(self.RESULTS_DIR, "plots\\"))
-        self.pacplots(self.X_train, file_name=self.FIG_NAME_IN, title='PaCMAP Visualisation of training data')
-        self.pacplots(self.trained_embeddings, file_name=self.FIG_NAME_OUT, title='PaCMAP Visualisation of trained embeddings')
+        plot_folder = os.path.join(self.RESULTS_DIR, "plots")
+        if not os.path.exists(plot_folder):
+            os.makedirs(plot_folder)
+        self.pacplots(plot_folder)
 
 class SilhouetteMetric(object):
     def __init__(self, label_mapping):

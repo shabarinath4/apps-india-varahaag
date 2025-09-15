@@ -32,7 +32,7 @@ from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.models import load_model
 from src.data.data_loader_rise import DataLoader
 from src.data.preprocess_rise import Preprocess
-from src.models.fsl3 import Infer
+from src.models.inference import Infer
 
 
 # correct doc strings everywhere
@@ -159,13 +159,28 @@ class VarahaIndia:
                             s2_files.append(full_path)
 
             return s1_files, s2_files
+    
+    def find_csv_files(
+            self,
+            root_dir
+    ):
+            files = []
+
+            for dirpath, dirnames, filenames in os.walk(root_dir):
+                for file in filenames:
+                    if file.endswith('.csv'):
+                        full_path = os.path.join(dirpath, file)
+                        files.append(full_path)
+
+
+            return files
         
     def read_and_standardize_csv(
             self, 
             file_list
     ):
         dfs = []
-        replacement = 'cropname'
+        replacement = 'crop_name'
         for f in file_list:
             df = pd.read_csv(f)
             df.columns = [
@@ -186,19 +201,11 @@ class VarahaIndia:
         UID = self.meta["UID"]
         min_count = self.meta["min_sample_per_class"]
 
-        # read all s1 s2 files
-        s1_files, s2_files = self.find_s1_s2_csv_files(self.REGION_PATH)
-        s1_df = self.read_and_standardize_csv(s1_files)
-        s2_df = self.read_and_standardize_csv(s2_files)
+        # read all s1 s2 files and standardise columns
+        files = self.find_csv_files(self.REGION_PATH)
+        merged_df = self.read_and_standardize_csv(files)
 
-        # drop duplicates and merge
-        s1_df = s1_df.drop_duplicates(subset=UID)
-        s2_df = s2_df.drop_duplicates(subset=UID)
-        merged_df = pd.merge(s1_df, s2_df, on=UID)
-        merged_df = merged_df.sort_values(by=UID).reset_index(drop=True)
-        num_samples = merged_df.shape[0]
-
-        label_column = 'cropname_x'
+        label_column = 'crop_name'
         merged_df = merged_df.dropna(subset=[label_column])
         merged_df = merged_df.drop_duplicates()
         merged_df[label_column] = merged_df[label_column].str.lower().str.replace(' ', '_')
@@ -208,23 +215,28 @@ class VarahaIndia:
                 lambda x: x if x in self.crops_to_keep else 'others'
             )
 
+        # Filter low count pixels
         label_counts = merged_df[label_column].value_counts()
-        valid_labels = label_counts[label_counts > min_count].index
-        mask = merged_df[label_column].isin(valid_labels)
-        merged_df = merged_df[mask]
+        uid_counts = merged_df.groupby(label_column)[UID].transform('nunique')
+
+        merged_df = merged_df[
+            (merged_df[label_column].map(label_counts) > min_count)
+            & (uid_counts >= 5)
+        ]
 
         labels = merged_df[label_column].values
         ids = merged_df[UID].values
         idx = merged_df.index.values
+        logger.info(f"Dropped labels with less than {min_count}")
 
+        # convert to datacube format
         num_samples = merged_df.shape[0]
         data = np.empty((num_samples, len(self.TOTAL_TS), len(self.BANDS_SELECTED)))
+
         for t_idx, time in enumerate(self.TOTAL_TS):
             for b_idx, band in enumerate(self.BANDS_SELECTED):
                 col = f"{time}_{band}"
                 data[:, t_idx, b_idx] = merged_df[col].values
-
-        logger.info(f"Dropped labels with less than {min_count}")
 
         # add VIs
         data, _, _ = self.harmonise_VarahaIndia_S1S2(data, self.BAND_NAMES, self.BAND_NAME_MAP)
@@ -235,9 +247,13 @@ class VarahaIndia:
         data, outlier_dict, normalise_dict = preprocess.prep(self.OUTLIER_PER_TIMESTAMP, self.mask_value)
         logger.info("Preprocessing complete")
         
-        # # resampling
-        # logger.info(f"Resampling")
-        # data = preprocess.resample_time_series(data, self.ORIGINAL_INTERVAL_DAYS, self.TARGET_INTERVAL_DAYS)
+        # resampling
+        import time
+        t0 = time.time()
+        logger.info(f"Resampling")
+        data = preprocess.resample_time_series(data, self.ORIGINAL_INTERVAL_DAYS, self.TARGET_INTERVAL_DAYS)
+        t1 = time.time()
+        logger.info(f"Resampling took {t1 - t0:.2f} seconds")
         
         # select final bands and timestamps
         data = data[:, :, self.FEATURES_IDX]
@@ -245,6 +261,7 @@ class VarahaIndia:
         features = self.FEATURES
         logger.info("Band and VI selection done")
 
+        # train at plot level or pixel level
         if self.plot_level_train:
             unique_ids = np.unique(ids)
             data_processed = []
@@ -277,7 +294,10 @@ class VarahaIndia:
         else:
             labels = labels
 
-        return data, labels, ids, idx, features, self.FEATURES_IDX, outlier_dict, normalise_dict
+        # define domains
+        domains = None
+
+        return data, labels, ids, idx, domains, features, self.FEATURES_IDX, outlier_dict, normalise_dict
     
     def deploy_Varaha_S1_S2_fsl(
             self,
@@ -287,17 +307,19 @@ class VarahaIndia:
         ):
 
         UID = self.meta["UID"]
+        # read all s1 s2 files and standardise columns
+        files = self.find_csv_files(inf_in)
+        merged_df = self.read_and_standardize_csv(files)
 
-        # read and combine all csvs
-        s1_files, s2_files = self.find_s1_s2_csv_files(inf_in)
-        s1_df = self.read_and_standardize_csv(s1_files)
-        s2_df = self.read_and_standardize_csv(s2_files)
+        label_column = 'crop_name'
+        merged_df = merged_df.dropna(subset=[label_column])
+        merged_df = merged_df.drop_duplicates()
+        merged_df[label_column] = merged_df[label_column].str.lower().str.replace(' ', '_')
 
-        # drop duplicates
-        s1_df = s1_df.drop_duplicates(subset=UID)
-        s2_df = s2_df.drop_duplicates(subset=UID)
-        merged_df = pd.merge(s1_df, s2_df, on=UID)
-        merged_df = merged_df.sort_values(by=UID).reset_index(drop=True)
+        # read all s1 s2 files and standardise columns
+        files = self.find_csv_files(self.REGION_PATH)
+        merged_df = self.read_and_standardize_csv(files)
+
         num_samples = merged_df.shape[0]
         ids = merged_df[UID]
 
@@ -308,17 +330,11 @@ class VarahaIndia:
                 col = f"{time}_{band}"
                 data[:, t_idx, b_idx] = merged_df[col].values
 
-        # load model
-        emb_path = Path(self.model_dir / f"{model_type}_embeddings.npy")
-        labels_path = Path(self.model_dir / f"{model_type}_labels.npy")
+                # load model
+        emb_path = Path(self.model_dir / "base_embeddings.npy")
+        labels_path = Path(self.model_dir / "base_labels.npy")
         model_path = Path(self.model_dir / "model.h5")
-        faiss_idx_path = Path(self.model_dir / f"{model_type}_index.faiss")
-
-        # Load dict  
-        with open(Path(self.model_dir / "normalise_dict.json"), 'r') as f_in:
-            normalise_dict = json.load(f_in)
-        with open(Path(self.model_dir / "outlier_dict.json"), 'r') as f_in:
-            outlier_dict = json.load(f_in)
+        faiss_idx_path = Path(self.model_dir / "base_index.faiss")
 
         # Load inference object
         infer = Infer()
@@ -360,6 +376,12 @@ class VarahaIndia:
         except Exception:
             index = None
             labels = None
+            
+        # Load dict  
+        with open(Path(self.model_dir / "normalise_dict.json"), 'r') as f_in:
+            normalise_dict = json.load(f_in)
+        with open(Path(self.model_dir / "outlier_dict.json"), 'r') as f_in:
+            outlier_dict = json.load(f_in)
 
         import time
         t0 = time.time()
@@ -379,18 +401,17 @@ class VarahaIndia:
         logger.info(f"Preprocessing took {t1 - t0:.2f} seconds")
         
         # resampling
-        # t0 = time.time()
-        # logger.info(f"Resampling")
-        # data = preprocess.resample_time_series(data, self.ORIGINAL_INTERVAL_DAYS, self.TARGET_INTERVAL_DAYS)
-        # t1 = time.time()
-        # logger.info(f"Resampling took {t1 - t0:.2f} seconds")
-        # data = np.expand_dims(data, axis=-1)
+        t0 = time.time()
+        logger.info(f"Resampling")
+        data = preprocess.resample_time_series(data, self.ORIGINAL_INTERVAL_DAYS, self.TARGET_INTERVAL_DAYS)
+        t1 = time.time()
+        logger.info(f"Resampling took {t1 - t0:.2f} seconds")
+        data = np.expand_dims(data, axis=-1)
     
         # select bands and timestamps
         data = data[:, :, self.FEATURES_IDX]
         data = data[:, np.arange(self.TS_SLICE_IDX[0], self.TS_SLICE_IDX[1], 1), :]
-
-        # run inference
+            
         predictions, distances = infer.infer(base_network, embeddings, embeddings_labels, index, data)
         np.save(inf_out / "predictions.npy", predictions)
         np.save(inf_out / "distances.npy", distances)

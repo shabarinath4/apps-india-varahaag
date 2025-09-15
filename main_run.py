@@ -62,8 +62,8 @@ def main():
     base_path = Path(os.getcwd())
     with open(base_path / "region_config.yaml", "r") as f:
         dataset_meta = yaml.safe_load(f)
-        
     meta = None
+    print(dataset_meta)
     if bt_path_ids:
         try:
             bt_path_ids = [item.strip() for item in bt_path_ids.split(",")]

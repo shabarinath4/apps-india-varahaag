@@ -25,6 +25,11 @@ import matplotlib.pyplot as plt
 from typing import List, Union
 from sklearn.cluster import KMeans
 import pandas as pd
+from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans
+import numpy as np
+import matplotlib.pyplot as plt
+import datetime
 
 class Explainability():
     def __init__(self):
@@ -249,33 +254,50 @@ class Plots():
 
         for class_label in unique_classes:
             for i, band_idx in enumerate(np.arange(len(FEATURES_IDX))):
-                if i == 7:  # You can change or remove this condition as needed
+                if i == 7:  # or whichever band you want
                     crop_name = label_mapping[class_label]
                     color = crop_colors[class_label]
-                    fig, ax = plt.subplots(figsize=(10, 6))
-
+                    
                     class_data = X[y == class_label, :, band_idx]  # shape: (samples, time)
                     x_vals = np.arange(T)
-
-                    # Plot individual sample lines
-                    for sample in class_data:
-                        ax.plot(x_vals, sample, color=color, alpha=0.3, linewidth=0.8)
-
-                    # Optionally add median line
-                    median = np.median(class_data, axis=0)
-                    ax.plot(x_vals, median, color=color, label=crop_name, linewidth=2)
-
-                    ax.set_title(f'Crop {crop_name} - {band_names[band_idx]}')
-                    step = 3
-                    dates = [start_date + datetime.timedelta(days=ti*interval_days) for ti in range(T)]
-                    ax.set_xticks(x_vals[::step])
-                    # ax.set_xticklabels([d.strftime('%d %b') for d in dates][::step], rotation=45)
-                    ax.set_xlabel("Time")
-                    ax.set_ylabel("Reflectance")
-                    ax.grid(True, linestyle='--', alpha=0.5)
-                    ax.legend()
-
+                    
+                    n_clusters = min(10, len(class_data))  # maximum 10 clusters or fewer if not enough samples
+                    if n_clusters < 2:  # skip if too few samples
+                        continue
+                    
+                    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=5)
+                    cluster_labels = kmeans.fit_predict(class_data)
+                    
+                    # Count cluster sizes and sort clusters by size descending
+                    cluster_sizes = [np.sum(cluster_labels == k) for k in range(n_clusters)]
+                    sorted_clusters = np.argsort(cluster_sizes)[::-1]  # largest to smallest
+                    
+                    # Create subplots for clusters
+                    fig, axes = plt.subplots(1, n_clusters, figsize=(4*n_clusters, 4), sharey=True)
+                    if n_clusters == 1:
+                        axes = [axes]
+                    
+                    for idx, k in enumerate(sorted_clusters):
+                        ax = axes[idx]
+                        cluster_data = class_data[cluster_labels == k]
+                        
+                        # Plot all samples in the cluster
+                        for sample in cluster_data:
+                            ax.plot(x_vals, sample, color=color, alpha=0.3, linewidth=0.8)
+                        
+                        # Plot cluster median
+                        median = np.median(cluster_data, axis=0)
+                        ax.plot(x_vals, median, color='red', linestyle='--', linewidth=2, label='Cluster median')
+                        
+                        ax.set_title(f'Cluster {idx+1} ({cluster_sizes[k]} samples)')
+                        step = 3
+                        dates = [start_date + datetime.timedelta(days=ti*interval_days) for ti in range(T)]
+                        ax.set_xticks(x_vals[::step])
+                        # ax.set_xticklabels([d.strftime('%d %b') for d in dates][::step], rotation=45)
+                        ax.grid(True, linestyle='--', alpha=0.5)
+                        ax.legend()
+                    
                     plt.tight_layout()
-                    fname = f"{RESULTS_DIR}/{train_mode}/crop_line_{crop_name}_{band_names[band_idx]}.png"
+                    fname = f"{RESULTS_DIR}/{train_mode}/crop_clusters_{crop_name}_{band_names[band_idx]}.png"
                     plt.savefig(fname, dpi=300)
                     plt.close()

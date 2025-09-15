@@ -70,6 +70,62 @@ def load_region_data(
         )
         return load_region.load_cimmyt_ethiopia_S1_S2()
 
+# # =======================
+# # RUN DATA DRIVEN OR KNOWLEDGE DRIVEN MODELS
+# # =======================
+# def load_and_concat(
+#         base_path,
+#         path_ids, 
+#         results_dir, 
+#         model_dir, 
+#         mode, 
+#         plot_level_train, 
+#         mask_value
+# ):
+#     from collections import defaultdict
+#     x_dict_all = defaultdict(list)
+#     y_list, idx_list, ids_list = [], [], []
+#     outlier_dicts = []
+#     normalise_dicts = []
+#     features = None
+
+#     import numpy as np
+#     for i, pid in enumerate(path_ids):
+#         X, y, ids, idx, features_tmp, features_idx, outlier_dict, normalise_dict = load_region_data(
+#             base_path,
+#             pid, 
+#             results_dir, 
+#             model_dir, 
+#             mode, 
+#             plot_level_train, 
+#             mask_value
+#         )
+
+#         for k,v in X.items():
+#             x_dict_all[k].append(v)
+
+#         y_list.append(y)
+#         unique_idx = np.array([f"{i}_{x}" for x in idx])
+#         idx_list.append(unique_idx)
+#         ids_list.append(ids)
+#         outlier_dicts.append(outlier_dict)
+#         normalise_dicts.append(normalise_dict)
+
+#         if features is None:
+#             features = features_tmp
+
+#     for k in x_dict_all:
+#         x_dict_all[k] = np.concatenate(x_dict_all[k], axis=0)
+
+#     y_all = np.concatenate(y_list, axis=0)
+#     idx_all = np.concatenate(idx_list, axis=0)
+#     ids_all = np.concatenate(ids_list, axis=0)
+
+#     le = LabelEncoder()
+#     y_all = le.fit_transform(y_all)
+
+#     return x_dict_all, y_all, ids_all, features, features_idx, idx_all, le, outlier_dicts, normalise_dicts
+
 # =======================
 # RUN DATA DRIVEN OR KNOWLEDGE DRIVEN MODELS
 # =======================
@@ -82,14 +138,15 @@ def load_and_concat(
         plot_level_train, 
         mask_value
 ):
-    X_list, y_list, idx_list, ids_list = [], [], [], []
+    from collections import defaultdict
+    x_list, y_list, idx_list, ids_list = [], [], [], []
     outlier_dicts = []
     normalise_dicts = []
     features = None
 
     import numpy as np
     for i, pid in enumerate(path_ids):
-        X, y, ids, idx, features_tmp, features_idx, outlier_dict, normalise_dict = load_region_data(
+        X, y, ids, idx, domains, features_tmp, features_idx, outlier_dict, normalise_dict = load_region_data(
             base_path,
             pid, 
             results_dir, 
@@ -98,7 +155,8 @@ def load_and_concat(
             plot_level_train, 
             mask_value
         )
-        X_list.append(X)
+
+        x_list.append(X)
         y_list.append(y)
         unique_idx = np.array([f"{i}_{x}" for x in idx])
         idx_list.append(unique_idx)
@@ -109,15 +167,16 @@ def load_and_concat(
         if features is None:
             features = features_tmp
 
-    X_all = np.concatenate(X_list, axis=0)
+    x_all = np.concatenate(x_list, axis=0)
     y_all = np.concatenate(y_list, axis=0)
     idx_all = np.concatenate(idx_list, axis=0)
     ids_all = np.concatenate(ids_list, axis=0)
 
-    le = LabelEncoder()
-    y_all = le.fit_transform(y_all)
+    # le = LabelEncoder()
+    # y_all = le.fit_transform(y_all)
 
-    return X_all, y_all, ids_all, features, features_idx, idx_all, le, outlier_dicts, normalise_dicts
+    return x_all, y_all, ids_all, features, features_idx, domains, idx_all, outlier_dicts, normalise_dicts
+
 
 def load_existing_model(
     MODEL_DIR: str
@@ -186,7 +245,7 @@ def make_ml_ready(
 
         id_train, id_test = train_test_split(
             id_list,
-            test_size=0.05,
+            test_size=0.3,
             random_state=1,
             stratify=label_list if len(np.unique(label_list)) > 1 else None
         )

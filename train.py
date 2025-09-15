@@ -1,10 +1,9 @@
 import os
 import json
 import logging
-
 import numpy as np
 import pandas as pd
-from sklearn.utils import resample
+
 import numpy as np
 import faiss
 import joblib
@@ -13,10 +12,15 @@ import tensorflow as tf
 tf.config.set_visible_devices([], 'GPU')
 from tensorflow.keras.models import load_model
 
+from sklearn.utils import resample
+from sklearn.preprocessing import LabelEncoder
+
 from src.models.fsl3 import Train
 from src.loader import load_and_concat, make_ml_ready
 from src.models.evaluate import evaluate_base_model, evaluate_finetuned_model
 from src.utils.plots import Plots
+from sklearn.utils import resample
+import numpy as np
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -49,19 +53,25 @@ class TemporalPyramidPooling(tf.keras.layers.Layer):
         return config
             
 def sample_multiple(X_list, y, sampling_technique, sampling_mode, n=None, random_state=42):
-        """
-        Resample multiple X arrays and one y array consistently using the 'Resample' technique.
-        Assumes all X arrays have the same number of rows (samples) as y.
-        """
+    """
+    Resample multiple X arrays and one y array consistently using the 'Resample' technique.
+    Assumes all X arrays have the same number of rows (samples) as y.
+    """
 
-        if sampling_technique != 'Resample':
-            raise ValueError("Currently sample_multiple supports only 'Resample' technique")
+    if sampling_technique != 'Resample':
+        raise ValueError("Currently sample_multiple supports only 'Resample' technique")
 
-        # Get class counts from original y
-        unique, counts = np.unique(y, return_counts=True)
-        class_counts = dict(zip(unique, counts))
+    unique, counts = np.unique(y, return_counts=True)
+    class_counts = dict(zip(unique, counts))
 
-        # Decide n_samples per class depending on mode
+    resampled_Xs = [[] for _ in X_list]
+    resampled_y = []
+
+    for cls in unique:
+        mask = (y == cls)
+        cls_count = class_counts[cls]
+        cls_indices = np.where(mask)[0]
+
         if sampling_mode == 'majority':
             n_samples = max(class_counts.values())
         elif sampling_mode == 'minority':
@@ -72,31 +82,30 @@ def sample_multiple(X_list, y, sampling_technique, sampling_mode, n=None, random
             if n is None:
                 raise ValueError("Specify a fixed number to sample")
             n_samples = n
+        elif sampling_mode == 'min200':
+            # If a crop/class has fewer than 200 samples, resample to 200
+            # Otherwise, leave it as-is
+            n_samples = cls_count if cls_count >= 200 else 200
         else:
             raise ValueError("Invalid sampling_mode")
 
-        # Prepare containers for resampled X arrays and y
-        resampled_Xs = [ [] for _ in X_list ]
-        resampled_y = []
+        # Resample indices for this class
+        resampled_indices = resample(
+            cls_indices,
+            n_samples=n_samples,
+            replace=True if n_samples > cls_count else False,  # only replace if upsampling
+            random_state=random_state
+        )
 
-        # For each class, resample indices and gather samples for each X array
-        for cls in unique:
-            mask = (y == cls)
-            cls_count = class_counts[cls]
-            # Resample indices of this class to n_samples with replacement
-            cls_indices = np.where(mask)[0]
-            resampled_indices = resample(cls_indices, n_samples=n_samples, replace=True, random_state=random_state)
+        for i, X in enumerate(X_list):
+            resampled_Xs[i].append(X[resampled_indices])
+        resampled_y.append(np.full(shape=n_samples, fill_value=cls))
 
-            # Append corresponding samples for each X array
-            for i, X in enumerate(X_list):
-                resampled_Xs[i].append(X[resampled_indices])
-            resampled_y.append(np.full(shape=n_samples, fill_value=cls))
+    resampled_Xs = [np.vstack(parts) for parts in resampled_Xs]
+    resampled_y = np.hstack(resampled_y)
 
-        # Concatenate all classes
-        resampled_Xs = [np.vstack(parts) for parts in resampled_Xs]
-        resampled_y = np.hstack(resampled_y)
+    return (*resampled_Xs, resampled_y)
 
-        return (*resampled_Xs, resampled_y)
 
 def test_no_leakage(idx_train_bt, idx_test_ft):
     intersection_train = set(idx_train_bt).intersection(set(idx_test_ft))
@@ -104,6 +113,11 @@ def test_no_leakage(idx_train_bt, idx_test_ft):
         print(f"Leakage detected: finetune TEST indices overlap with base TRAIN indices: {intersection_train}")
     else:
         print("No leakage: finetune TEST and base TRAIN sets are disjoint.")
+
+def concat_dict(data_dict):
+    shapes = {k: data_dict[k].shape for k in data_dict.keys()}
+    knw_broadcast = np.repeat(data_dict['knw'][:, None, :], data_dict['train'].shape[1], axis=1)
+    merged = np.concatenate([data_dict['train'], knw_broadcast], axis=-1)
 
 def train_model(**kwargs):
     
@@ -160,14 +174,18 @@ def train_model(**kwargs):
         # Base Training
         # =======================  
         # Load basetraining data
-        X_bt, y_bt, ids_all, features_bt, features_idx, features_bt_idx, le_bt, outlier_bt_list, normalise_bt_list = load_and_concat(
+        X_bt, y_bt, ids_all, features_bt, features_idx, features_bt_idx, domains, outlier_bt_list, normalise_bt_list = load_and_concat(
             base_path, bt_path_ids, results_dir, model_dir, mode, plot_level_train, MASK_VALUE
         )
 
-        # Make ML ready
         X_train_3d_bt, X_test_3d_bt, X_train_input_bt, X_test_input_bt, \
         X_train_model_bt, X_test_model_bt, y_train_bt, y_test_bt, \
         idx_train_bt, idx_test_bt = make_ml_ready(X_bt, y_bt, ids_all, features_bt, use_3d)
+
+        le_bt = LabelEncoder()
+        le_bt.fit(y_train_bt)
+        y_train_bt = le_bt.transform(y_train_bt)
+        y_test_bt  = le_bt.transform(y_test_bt)
 
         # Sample data
         if resample_data:
@@ -177,13 +195,14 @@ def train_model(**kwargs):
                 [X_train_input_bt, X_train_3d_bt, X_train_model_bt],
                 y_train_bt,
                 sampling_technique='Resample',
-                sampling_mode='fixed',
+                sampling_mode='min200',
                 n=500
             )
             log.info(f"Post sampling:")
             log.info(f"{pd.Series(y_train_bt).value_counts()}")
+            
         label_mapping = dict(zip(le_bt.transform(le_bt.classes_), le_bt.classes_))
-
+ 
         # Plot signatures
         plot_obj = Plots()
         plot_obj.plot_clusters(
@@ -194,9 +213,22 @@ def train_model(**kwargs):
             features_idx,
             mode="paper",
             RESULTS_DIR=results_dir,
-            train_mode="base",
+            train_mode="base_train",
             )
-
+        
+        # Plot signatures
+        plot_obj = Plots()
+        plot_obj.plot_clusters(
+            X_test_3d_bt,
+            y_test_bt,
+            label_mapping,
+            features_bt, 
+            features_idx,
+            mode="paper",
+            RESULTS_DIR=results_dir,
+            train_mode="base_test",
+            )
+        
         # Start training
         log.info("----Start DECIFR BASE Training----")
         train = Train(
@@ -210,6 +242,8 @@ def train_model(**kwargs):
         base_network, prototypes, prototypes_labels, \
         base_embeddings, base_params, base_labels, base_index, _ = train.train_model(
             loss_type='triplet',
+            triplet_strategy='standard',
+            domain_array=domains,
             episodic=False,
             episodes=3,
             k_way=5,
@@ -218,7 +252,7 @@ def train_model(**kwargs):
             n_epochs=bt_epochs,
             patience=patience
         )
-
+        
         # evaluate
         base_eval_results = evaluate_base_model(
             base_network, 
@@ -231,6 +265,7 @@ def train_model(**kwargs):
             X_train_input=X_train_input_bt, 
             y_train=y_train_bt,
             results_dir=results_dir,
+            model_dir=model_dir,
             le=le_bt
         )
         log.info(f"Xtrain : {X_train_model_bt.shape}")
@@ -264,8 +299,8 @@ def train_model(**kwargs):
             idx_test_bt = None
 
         # Prepare ML-ready data
-        X_train_3d_ft, X_test_3d_ft, X_input_train_ft, X_input_test_ft, \
-        X_model_train_ft, X_model_test_ft, y_train_ft, y_test_ft, \
+        X_train_3d_ft, X_test_3d_ft, X_train_input_ft, X_test_input_ft, \
+        X_train_model_ft, X_test_model_ft, y_train_ft, y_test_ft, \
         idx_train_ft, idx_test_ft = make_ml_ready(
             X_ft, y_ft, ids_all, features_ft, use_3d,
             link_to_bt_test_idx=idx_test_bt,
@@ -301,9 +336,9 @@ def train_model(**kwargs):
 
         # Train (fine-tune) model using all training data
         train = Train(
-            X_model_train_ft, 
+            X_train_model_ft, 
             y_train_ft, 
-            X_model_test_ft, 
+            X_test_model_ft, 
             y_test_ft, 
             comb_per_sample, 
             training_params
@@ -324,7 +359,7 @@ def train_model(**kwargs):
 
         ft_model, _, _, X_train_used_ft, ft_embeddings, ft_params, ft_labels, ft_index, _ = train.finetune(
             base_network=base_network,
-            support_x=X_model_train_ft,
+            support_x=X_train_model_ft,
             support_y=y_train_ft,
             loss_type='triplet',
             n_epochs=ft_epochs,
@@ -335,14 +370,15 @@ def train_model(**kwargs):
         # Evaluate on held-out test data
         finetune_eval_results = evaluate_finetuned_model(
             ft_model,
-            X_model_train_ft,
+            X_train_model_ft,
             y_train_ft,
-            X_model_test_ft,
+            X_test_model_ft,
             y_test_ft,
             ft_embeddings,
             ft_labels,
             ft_index,
             results_dir,
+            model_dir,
             le_ft
         )
 
@@ -378,7 +414,8 @@ def train_model(**kwargs):
         )
 
         # Run few-shot evaluation
-        fs_model, _, _, X_used_fs, fs_embeddings, fs_params, fs_labels, fs_index, _ = train.few_shot_predict(
+        eval_fsl_obj = Evaluate()
+        fs_model, _, _, X_used_fs, fs_embeddings, fs_params, fs_labels, fs_index, _ = eval_fsl_obj.few_shot_predict(
             model=ft_model,
             x_data=X_model_train_fs,
             y_data=y_train_fs,
@@ -405,8 +442,5 @@ def train_model(**kwargs):
         np.save(os.path.join(model_dir, 'fewshot_embeddings.npy'), fs_embeddings)
         np.save(os.path.join(model_dir, 'fewshot_labels.npy'), fs_labels)
         faiss.write_index(fs_index, os.path.join(model_dir, 'fewshot_index.faiss'))
-
         joblib.dump(le_fs, model_dir / "le_fs.pkl")
         joblib.dump(features_fs, model_dir / "features_fs.pkl")
-    
-    exit()

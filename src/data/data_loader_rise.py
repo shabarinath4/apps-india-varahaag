@@ -1,4 +1,3 @@
-
 import numpy as np
 
 class DataLoader(object):
@@ -64,6 +63,48 @@ class DataLoader(object):
         new_data[:, :, bands] = cri
 
         new_band_names = self.band_names + ['CRI']
+
+        return new_data, new_band_names
+
+    def CFI3(self, data, v, NDVI_TS):
+        band_green = v[0]
+        band_blue = v[1]
+
+        green = data[:, :, band_green]
+        blue = data[:, :, band_blue]
+
+        mask = (green == self.no_data_value) | (blue == self.no_data_value)
+
+        cri = green / (blue + 1e-10)
+        cri[mask] = self.no_data_value
+
+        samples, time, bands = data.shape
+        new_data = np.zeros((samples, time, bands + 1), dtype=np.float32)
+        new_data[:, :, :bands] = data
+        new_data[:, :, bands] = cri
+
+        new_band_names = self.band_names + ['CRI']
+
+        return new_data, new_band_names
+    
+    def NDYI(self, data, v):
+        band_green = v[0]
+        band_blue = v[1]
+
+        green = data[:, :, band_green]
+        blue = data[:, :, band_blue]
+
+        mask = (green == self.no_data_value) | (blue == self.no_data_value)
+
+        ndyi = (green - blue) / (green + blue + 1e-10)
+        ndyi[mask] = self.no_data_value
+
+        samples, time, bands = data.shape
+        new_data = np.zeros((samples, time, bands + 1), dtype=np.float32)
+        new_data[:, :, :bands] = data
+        new_data[:, :, bands] = ndyi
+
+        new_band_names = self.band_names + ['NDYI']
 
         return new_data, new_band_names
 
@@ -231,6 +272,94 @@ class DataLoader(object):
         new_band_names = self.band_names + ['CIre']
 
         return new_data, new_band_names
+    
+    def MTCI(self, data, v):
+        # v contains band indices: [red_index, red_edge_index, nir_index]
+        band_red = v[0]
+        band_re = v[1]
+        band_nir = v[2]
+
+        red = data[:, :, band_red]
+        re = data[:, :, band_re]
+        nir = data[:, :, band_nir]
+
+        mask = (red == self.no_data_value) | (re == self.no_data_value) | (nir == self.no_data_value)
+
+        mtci = (nir - re) / (re - red + 1e-6)
+        mtci[mask] = self.no_data_value
+
+        samples, time, bands = data.shape
+        new_data = np.zeros((samples, time, bands + 1), dtype=np.float32)
+        new_data[:, :, :bands] = data
+        new_data[:, :, bands] = mtci
+
+        new_band_names = self.band_names + ['MTCI']
+        return new_data, new_band_names
+
+    def EVI2(self, data, v):
+        # v contains band indices: [red_index, nir_index]
+        band_red = v[0]
+        band_nir = v[1]
+
+        red = data[:, :, band_red]
+        nir = data[:, :, band_nir]
+
+        mask = (red == self.no_data_value) | (nir == self.no_data_value)
+
+        evi2 = 2.5 * (nir - red) / (nir + 2.4 * red + 1.0)
+        evi2[mask] = self.no_data_value
+
+        samples, time, bands = data.shape
+        new_data = np.zeros((samples, time, bands + 1), dtype=np.float32)
+        new_data[:, :, :bands] = data
+        new_data[:, :, bands] = evi2
+
+        new_band_names = self.band_names + ['EVI2']
+        return new_data, new_band_names
+
+    def PRI_proxy(self, data, v):
+        # v contains band indices: [green_index, green_i_index]
+        band_green = v[0]
+        band_green_i = v[1]
+
+        green = data[:, :, band_green]
+        green_i = data[:, :, band_green_i]
+
+        mask = (green == self.no_data_value) | (green_i == self.no_data_value)
+
+        pri = (green_i - green) / (green_i + green + 1e-6)
+        pri[mask] = self.no_data_value
+
+        samples, time, bands = data.shape
+        new_data = np.zeros((samples, time, bands + 1), dtype=np.float32)
+        new_data[:, :, :bands] = data
+        new_data[:, :, bands] = pri
+
+        new_band_names = self.band_names + ['PRI_proxy']
+        return new_data, new_band_names
+
+    def PSRI(self, data, v):
+        # v contains band indices: [red_index, green_index, nir_index]
+        band_red = v[0]
+        band_green = v[1]
+        band_nir = v[2]
+
+        red = data[:, :, band_red]
+        green = data[:, :, band_green]
+        nir = data[:, :, band_nir]
+
+        mask = (red == self.no_data_value) | (green == self.no_data_value) | (nir == self.no_data_value)
+
+        psri = (red - green) / (nir + 1e-6)
+        psri[mask] = self.no_data_value
+
+        samples, time, bands = data.shape
+        new_data = np.zeros((samples, time, bands + 1), dtype=np.float32)
+        new_data[:, :, :bands] = data
+        new_data[:, :, bands] = psri
+
+        new_band_names = self.band_names + ['PSRI']
+        return new_data, new_band_names
 
     def REP(self, data, v):
         """
@@ -272,7 +401,6 @@ class DataLoader(object):
         return new_data, new_band_names
 
 
-
     def WBI(self, data, v):
         idx = [band for band in v]
         bands_vals = [data[:, :, i] for i in idx]
@@ -298,15 +426,15 @@ class DataLoader(object):
         return new_data, new_band_names
 
     def vis(self, data, index_name, bands_for_index, VIs):
-        if index_name == 'CFI3':
+        if index_name == 'NDVI':
+            data, features_vi = self.NDVI(data, bands_for_index)
+        elif index_name == 'CFI3':
             data, NDVI_TS = self.NDVI(data, VIs['NDVI'])
             data, features_vi = self.CFI3(data, bands_for_index, NDVI_TS)
         elif index_name == 'NDYI':
             data, features_vi = self.NDYI(data, bands_for_index)
         elif index_name == 'CRI':
             data, features_vi = self.CRI(data, bands_for_index)
-        elif index_name == 'NDVI':
-            data, features_vi = self.NDVI(data, bands_for_index)
         elif index_name == 'VHVV':
             data, features_vi = self.VHVV(data, bands_for_index)
         elif index_name == 'BHDI1':
@@ -317,13 +445,21 @@ class DataLoader(object):
             data, features_vi = self.BHDI3(data, bands_for_index)
         elif index_name == 'BHDI4':
             data, features_vi = self.BHDI4(data, bands_for_index)
-        elif index_name == 'REP':
-            data, features_vi = self.REP(data, bands_for_index)
         elif index_name == 'WBI':
             data, features_vi = self.WBI(data, bands_for_index)
+        elif index_name == 'REP':
+            data, features_vi = self.REP(data, bands_for_index)
         elif index_name == 'NDRE':
             data, features_vi = self.NDRE(data, bands_for_index)
         elif index_name == 'CIre':
+            data, features_vi = self.CIre(data, bands_for_index)
+        elif index_name == 'MTCI':
+            data, features_vi = self.CIre(data, bands_for_index)
+        elif index_name == 'EVI2':
+            data, features_vi = self.CIre(data, bands_for_index)
+        elif index_name == 'PRI_proxy':
+            data, features_vi = self.CIre(data, bands_for_index)
+        elif index_name == 'PSRI':
             data, features_vi = self.CIre(data, bands_for_index)
         else:
             raise ValueError(f"Unknown index_name: {index_name}")
