@@ -1,0 +1,56 @@
+shared_base_config: &base_config
+  model_dir_bt: null
+  UID: 'id' # unique column to merge S1 and S2 dataframes
+  label_columns: ['crop_name', 'cropname', 'comment'] # different label column names that exist in the data
+  total_ts: 16 # total timestamps in the data
+  ts_slice_idx: [0, 16] # the range of timestamps to use in the analysis
+  resample_ts: false
+  ORIGINAL_INTERVAL_DAYS: 20 # data compositing interval in days
+  TARGET_INTERVAL_DAYS: 10 # desired compositing interval in days
+  remove_bands: ["B1", "B10"] # the spectral bands to drop for the analysis
+  band_name_map:
+    'VH_dB': 'VH_dB'
+    'VV_dB': 'VV_dB'
+    'B2': 'B2' 
+    'B3': 'B3' 
+    'B4': 'B4' 
+    'B5': 'B5' 
+    'B6': 'B6' 
+    'B7': 'B7' 
+    'B8': 'B8' 
+    'B8A': 'B8A' 
+    'B11': 'B11' 
+    'B12': 'B12'
+  #"REP":[4, 5, 6, 7]
+  VIs: {"NDVI":[8, 4]} # vegetation indices and the band numbers to use and formula is in the script src/data/data_loader_rise.py. Index should follow what is in band_name_map
+  plot_level_train: true # to train and infer the data at plot or pixel level
+  crops_to_drop: [] # crops to drop for the analysis
+  min_sample_per_class: 20 # crops to drop which have a minimum sample count
+  group_crops: true # whether to group a set of crops to "others" category
+  # crops_to_keep: ["paddy_(transplanting)", "paddy_(dsr)", "cotton", "wheat", "maize"] # crops to NOT group
+  crops_to_keep: ["cotton"] # crops to NOT group
+  MASK_VALUE: -999 # the mask value in your data
+  outlier_per_timestamp: false # outlier calculated per ts or across ts
+  normalise_strategy: "IQR" # outlier and normalise strategy
+  resample_data: false # upsample data
+  pre_train_test_split: 'is_test'  
+  EXP_VER: "99" # experiment number
+  MODEL_TYPE: "fsl" # model architecture
+  batch_size: 256 # batch size
+  bt_epochs: 100 # epochs for base training
+  patience: 20 # number of epochs after which to quit if val_loss does not decrease
+  k_shot_value: [1, 5, 10, 'all'] # few shot experimental settings
+
+india_250909_bt:
+  <<: *base_config
+  path: "data/train_ready/india_250909_bt"
+
+india_250909_ft:
+  <<: *base_config
+  path: "data/train_ready/india_250909_ft"
+
+india_250909_inf_in:
+  <<: *base_config
+  path: "data/train_ready/india_250909_bt_inf_in"
+  results_dir: 'results/trials/fsl/99_fsl_20251014-103551_b77057e6-a2bf-45cb-af7f-ca2e83d6338a'
+  model_dir: 'saved_models/trials/fsl/99_fsl_20251014-103551_b77057e6-a2bf-45cb-af7f-ca2e83d6338a'

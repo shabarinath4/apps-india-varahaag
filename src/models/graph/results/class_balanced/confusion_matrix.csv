@@ -1,0 +1,9 @@
+,Cowpea + Pigeon_Pea,Groundnut,Maize,Maize + Cowpea,Maize + Groundnut,Maize + Pigeon_Pea,Maize + Soybean,Soybean
+Cowpea + Pigeon_Pea,9,0,4,0,0,0,0,0
+Groundnut,0,68,96,0,0,1,0,10
+Maize,0,17,800,0,0,4,0,50
+Maize + Cowpea,0,0,10,0,0,0,0,1
+Maize + Groundnut,0,3,33,0,0,1,0,1
+Maize + Pigeon_Pea,6,2,269,0,0,2,0,4
+Maize + Soybean,0,2,43,0,0,1,0,2
+Soybean,0,14,128,0,0,0,0,84

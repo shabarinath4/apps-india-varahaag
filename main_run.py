@@ -14,7 +14,7 @@ import yaml
 import argparse
 import uuid
 
-from train import train_model
+from scripts.train import train_model
 from src.utils.utilities import (FileOperations, VisualiseModelEmbeddings, SilhouetteMetric, PlotCnfClf)
 
 # Add relevant paths
@@ -60,10 +60,16 @@ def main():
     # Load YAML metadata for all datasets
     from pathlib import Path
     base_path = Path(os.getcwd())
-    with open(base_path / "region_config.yaml", "r") as f:
-        dataset_meta = yaml.safe_load(f)
+
+    if 'malawi' in bt_path_ids:
+        with open(base_path / "configs" / "malawi_cimmyt.yaml", "r") as f:
+            dataset_meta = yaml.safe_load(f)
+    if 'india' in bt_path_ids:
+        with open(base_path / "configs" / "india_varaha.yaml", "r") as f:
+            dataset_meta = yaml.safe_load(f)
+            
     meta = None
-    print(dataset_meta)
+
     if bt_path_ids:
         try:
             bt_path_ids = [item.strip() for item in bt_path_ids.split(",")]
@@ -89,7 +95,6 @@ def main():
     TARGET_INTERVAL_DAYS = meta["TARGET_INTERVAL_DAYS"]
     MASK_VALUE = meta["MASK_VALUE"]
     plot_level_train = meta["plot_level_train"]
-    comb_per_sample = meta["comb_per_sample"]
     resample_data = meta["resample_data"]
 
     # model
@@ -97,11 +102,8 @@ def main():
     MODEL_TYPE = meta["MODEL_TYPE"]
     batch_size = meta["batch_size"]
     bt_epochs = meta["bt_epochs"]
-    ft_epochs = meta["ft_epochs"]
     k_shot_value = meta["k_shot_value"]
-    min_delta = meta["min_delta"]
     patience = meta["patience"]
-    use_pretrained_model = meta["use_pretrained_model"]
 
     # out
     saved_models_root = Path("saved_models") / "trials" / MODEL_TYPE
@@ -129,16 +131,12 @@ def main():
             'plot_level_train': plot_level_train,
             'original_interval_days': ORIGINAL_INTERVAL_DAYS,
             'target_interval_days': TARGET_INTERVAL_DAYS,
-            'comb_per_sample': comb_per_sample,
             'mask_value': MASK_VALUE
         },
 
         'model': {
-            'use_pretrained_model': use_pretrained_model,
             'batch_size': batch_size,
             'bt_epochs': bt_epochs,
-            'ft_epochs': ft_epochs,
-            'min_delta': min_delta,
             'patience': patience,
             'k_shot_value': k_shot_value,
         },

@@ -23,6 +23,9 @@ from shapely.geometry import shape
 from sklearn.metrics import silhouette_score
 from sklearn.metrics import silhouette_samples
 
+from src.data.regional.malawi_cimmyt import MalawiCIMMYT
+from src.data.regional.ethiopia_cimmyt import EthiopiaCIMMYT
+from src.data.regional.india_varaha import IndiaVaraha
 
 class FileOperations(object):
     def __init__(self) -> None:

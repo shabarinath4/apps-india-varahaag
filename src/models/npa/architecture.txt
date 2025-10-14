@@ -1,0 +1,17 @@
+deap_search
+
+prepare
+	slice
+	composite
+features
+	create_temporal_features
+	create_spectral_indices
+model
+	KMeans
+	GMM
+rapseed
+	assign
+	set_labels
+
+
+	

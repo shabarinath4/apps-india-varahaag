@@ -1,12 +1,15 @@
 import os
 import json
-import numpy as np
 
 from typing import Any, Dict, Tuple
+from collections import defaultdict
+import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.models import load_model
 
-from src.data.varaha_india_gee import VarahaIndia
+from src.data.regional.malawi_cimmyt import MalawiCIMMYT
+from src.data.regional.ethiopia_cimmyt import EthiopiaCIMMYT
+from src.data.regional.india_varaha import IndiaVaraha
 
 import logging
 log = logging.getLogger(__name__)
@@ -20,22 +23,9 @@ def load_region_data(
     plot_level_train: Any,
     mask_value: int
 ) -> Any:
-    """
-    Loads the dataset for the specified region.
-
-    Parameters:
-        path_id (str): Identifier for the region ('malawi', 'india', 'ethiopia').
-        results_dir (str): Directory path for results.
-        model_dir (str): Directory path for the model.
-        mode (str): Mode of operation.
-        PLOT_LEVEL_TRAIN (Any): Parameter used for training plot level in 'india' region.
-
-    Returns:
-        Any: Loaded dataset object or data for the specified region.
-    """
-
+    
     if 'malawi' in path_id:
-        load_region = CIMMYTMalawi(
+        load_region = MalawiCIMMYT(
             base_path,
             path_id, 
             results_dir, 
@@ -47,7 +37,7 @@ def load_region_data(
         return load_region.load_CIMMYTMalawi_planet()
     
     elif 'india' in path_id:
-        load_region = VarahaIndia(
+        load_region = IndiaVaraha(
             base_path,
             path_id, 
             results_dir, 
@@ -59,7 +49,7 @@ def load_region_data(
         return load_region.load_varaha_india_S1_S2()
 
     elif 'ethiopia' in path_id:
-        load_region = CIMMYTEthiopia(
+        load_region = EthiopiaCIMMYT(
             base_path,
             path_id, 
             results_dir, 
@@ -70,65 +60,6 @@ def load_region_data(
         )
         return load_region.load_cimmyt_ethiopia_S1_S2()
 
-# # =======================
-# # RUN DATA DRIVEN OR KNOWLEDGE DRIVEN MODELS
-# # =======================
-# def load_and_concat(
-#         base_path,
-#         path_ids, 
-#         results_dir, 
-#         model_dir, 
-#         mode, 
-#         plot_level_train, 
-#         mask_value
-# ):
-#     from collections import defaultdict
-#     x_dict_all = defaultdict(list)
-#     y_list, idx_list, ids_list = [], [], []
-#     outlier_dicts = []
-#     normalise_dicts = []
-#     features = None
-
-#     import numpy as np
-#     for i, pid in enumerate(path_ids):
-#         X, y, ids, idx, features_tmp, features_idx, outlier_dict, normalise_dict = load_region_data(
-#             base_path,
-#             pid, 
-#             results_dir, 
-#             model_dir, 
-#             mode, 
-#             plot_level_train, 
-#             mask_value
-#         )
-
-#         for k,v in X.items():
-#             x_dict_all[k].append(v)
-
-#         y_list.append(y)
-#         unique_idx = np.array([f"{i}_{x}" for x in idx])
-#         idx_list.append(unique_idx)
-#         ids_list.append(ids)
-#         outlier_dicts.append(outlier_dict)
-#         normalise_dicts.append(normalise_dict)
-
-#         if features is None:
-#             features = features_tmp
-
-#     for k in x_dict_all:
-#         x_dict_all[k] = np.concatenate(x_dict_all[k], axis=0)
-
-#     y_all = np.concatenate(y_list, axis=0)
-#     idx_all = np.concatenate(idx_list, axis=0)
-#     ids_all = np.concatenate(ids_list, axis=0)
-
-#     le = LabelEncoder()
-#     y_all = le.fit_transform(y_all)
-
-#     return x_dict_all, y_all, ids_all, features, features_idx, idx_all, le, outlier_dicts, normalise_dicts
-
-# =======================
-# RUN DATA DRIVEN OR KNOWLEDGE DRIVEN MODELS
-# =======================
 def load_and_concat(
         base_path,
         path_ids, 
@@ -137,16 +68,15 @@ def load_and_concat(
         mode, 
         plot_level_train, 
         mask_value
-):
-    from collections import defaultdict
+):  
     x_list, y_list, idx_list, ids_list = [], [], [], []
     outlier_dicts = []
     normalise_dicts = []
+    knw_emb_list = []
     features = None
 
-    import numpy as np
     for i, pid in enumerate(path_ids):
-        X, y, ids, idx, domains, features_tmp, features_idx, outlier_dict, normalise_dict = load_region_data(
+        X, y, ids, idx, features_tmp, features_idx, outlier_dict, normalise_dict, domains, knw_emb, pre_train_test_split = load_region_data(
             base_path,
             pid, 
             results_dir, 
@@ -163,6 +93,7 @@ def load_and_concat(
         ids_list.append(ids)
         outlier_dicts.append(outlier_dict)
         normalise_dicts.append(normalise_dict)
+        knw_emb_list.append(knw_emb)
 
         if features is None:
             features = features_tmp
@@ -172,30 +103,16 @@ def load_and_concat(
     idx_all = np.concatenate(idx_list, axis=0)
     ids_all = np.concatenate(ids_list, axis=0)
 
-    # le = LabelEncoder()
-    # y_all = le.fit_transform(y_all)
+    if isinstance(knw_emb_list, list) and knw_emb_list[0] is None:
+        knw_emb_all = None
+    else:
+        knw_emb_all = np.concatenate(knw_emb_list, axis=0)
 
-    return x_all, y_all, ids_all, features, features_idx, domains, idx_all, outlier_dicts, normalise_dicts
-
+    return x_all, y_all, ids_all, features, features_idx, idx_all, outlier_dicts, normalise_dicts, domains, knw_emb_all, pre_train_test_split
 
 def load_existing_model(
     MODEL_DIR: str
 ) -> Tuple[Any, np.ndarray, np.ndarray, Dict, Dict, Dict]:
-    """
-    Loads a pre-trained model and associated metadata from disk.
-
-    Parameters:
-        MODEL_DIR (str): Directory containing the model files.
-
-    Returns:
-        Tuple containing:
-            - base_network: Loaded Keras model.
-            - embeddings (np.ndarray): Embeddings array.
-            - embeddings_labels (np.ndarray): Labels for embeddings.
-            - outlier_dict (dict): Dictionary with outlier information.
-            - normalise_dict (dict): Normalisation parameters.
-            - runtime_params (dict): Training parameters and runtime config.
-    """
     embeddings = np.load(os.path.join(MODEL_DIR, 'embeddings.npy'))
     embeddings_labels = np.load(os.path.join(MODEL_DIR, 'embeddings_labels.npy'))
     base_network = load_model(os.path.join(MODEL_DIR, 'model.keras'))
@@ -212,6 +129,7 @@ def load_existing_model(
 def make_ml_ready(
     X, y, ids_all, features, use_3d,
     link_to_bt_test_idx=None,
+    pre_train_test_split=None,
     idx=None
 ):
     import numpy as np
@@ -225,11 +143,22 @@ def make_ml_ready(
 
     log.info(f"Original value counts {np.unique(y, return_counts=True)}")
 
-    if link_to_bt_test_idx is None:
-        # Grouped split: ensure same id does not go to both train and test
-        unique_ids = np.unique(ids_all)
+    if pre_train_test_split is not None:
+        pre_train_test_split = np.array(pre_train_test_split)
+        train_mask = ~pre_train_test_split
+        test_mask = pre_train_test_split
+        train_mask = ~pre_train_test_split
+        X_train, y_train, idx_train = X[train_mask], y[train_mask], idx[train_mask]
+        X_test, y_test, idx_test = X[test_mask], y[test_mask], idx[test_mask]
 
-        # One label per id (e.g., majority or first label)
+    elif link_to_bt_test_idx is not None:
+        test_mask = np.isin(idx, link_to_bt_test_idx)
+        train_mask = ~test_mask
+        X_train, y_train, idx_train = X[train_mask], y[train_mask], idx[train_mask]
+        X_test, y_test, idx_test = X[test_mask], y[test_mask], idx[test_mask]
+
+    else:
+        unique_ids = np.unique(ids_all)
         id_to_label = {}
         for uid in unique_ids:
             id_indices = np.where(ids_all == uid)[0]
@@ -256,20 +185,12 @@ def make_ml_ready(
         X_train, y_train, idx_train = X[train_mask], y[train_mask], idx[train_mask]
         X_test, y_test, idx_test = X[test_mask], y[test_mask], idx[test_mask]
 
-    else:
-        test_mask = np.isin(idx, link_to_bt_test_idx)
-        train_mask = ~test_mask
-        X_train, y_train, idx_train = X[train_mask], y[train_mask], idx[train_mask]
-        X_test, y_test, idx_test = X[test_mask], y[test_mask], idx[test_mask]
-
-    # Remove NaNs
     train_mask_nan = ~np.isnan(X_train).any(axis=tuple(range(1, X_train.ndim)))
     X_train, y_train, idx_train = X_train[train_mask_nan], y_train[train_mask_nan], idx_train[train_mask_nan]
 
     test_mask_nan = ~np.isnan(X_test).any(axis=tuple(range(1, X_test.ndim)))
     X_test, y_test, idx_test = X_test[test_mask_nan], y_test[test_mask_nan], idx_test[test_mask_nan]
 
-    # Shuffle training data
     X_train, y_train, idx_train = shuffle(X_train, y_train, idx_train, random_state=42)
 
     def to_3d(X, features):

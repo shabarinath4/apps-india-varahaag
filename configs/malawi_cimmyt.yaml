@@ -1,0 +1,89 @@
+malawi_250812_v4_ft:
+  model_dir_bt: null
+  path: "data/train_ready/malawi_250812_v4_ft"
+  data_file: "data.npy"
+  ids_file: "ids.npy"
+  coords_file: "coords.npy"
+  meta_file: "harmonized_malawi_3857_v4.geojson"
+  cld_model_file: cloud_mask_rf.pkl
+  plot_level_train: true
+  total_ts: 27
+  ts_slice_width: 27
+  ts_step: 1
+  years: [2022, 2023]
+  ORIGINAL_INTERVAL_DAYS: 14 # data compositing interval in days
+  TARGET_INTERVAL_DAYS: 14 # desired compositing interval in days
+  band_name_map:
+    coastal_blue_median: COASTALBLUE
+    blue_median: B2
+    green_i_median: GREENI
+    green_median: B3
+    yellow_median: YELLOW
+    red_median: B4
+    rededge_median: REDEDGE
+    nir_median: B8
+    alpha_median: ALPHA
+  VIs: {"NDVI":[7, 5], 'CIre':[6, 7], 'NDRE':[6, 7]}   # vegetation indices and the band numbers to use and formula is in the script src/data/data_loader_rise.py
+  # crops_to_drop: ['Rice', 'Cassava', 'Cotton', 'Tobacco', 'Virgin', 'Sweet_Potato', 'Cowpea + Pigeon_Pea', 'Maize + Cowpea', 'Maize + Pigeon_Pea', 'Cowpea', 'Pigeon_Pea']
+  crops_to_drop: ['', 'Rice', 'Fallow', 'Irish_Potato', 'Pigeon_Pea', 'Potato', 'Pumpkin', 'Cowpea', 'Cassava', 'Cotton', 'Tobacco', 'Virgin', 'Sweet_Potato', 'Pigeon_Pea']
+  MASK_VALUE: 65535 # the mask value in your data
+  outlier_per_timestamp: false
+  normalise_strategy: "IQR"
+  resample_data: false # upsample data
+  pre_train_test_split: null
+  EXP_VER: "99" # experiment number
+  MODEL_TYPE: "fsl" # model architecture
+  model_dir_bt: null # to be specified in fine tune settings if base model needs to be loaded
+  batch_size: 256 # batch size
+  bt_epochs: 50 # epochs for base training
+  ft_epochs: 50 # epochs for fine tuning
+  min_delta: 0.0001 # min delta setting
+  patience: 20 # number of epochs after which to quit if val_loss does not decrease
+  use_pretrained_model: false # use pretrained model
+  k_shot_value: [1, 5, 10, 'all'] # few shot experimental settings
+
+malawi_250812_v4_ft:
+  model_dir_bt: null
+  path: "data/train_ready/malawi_250812_v4_ft"
+  data_file: "data.npy"
+  ids_file: "ids.npy"
+  coords_file: "coords.npy"
+  meta_file: "harmonized_malawi_3857_v4.geojson"
+  cld_model_file: cloud_mask_rf.pkl
+  plot_level_train: true
+  total_ts: 27
+  ts_slice_width: 27
+  ts_step: 1
+  years: [2022, 2023]
+  band_name_map:
+    coastal_blue_median: COASTALBLUE
+    blue_median: B2
+    green_i_median: GREENI
+    green_median: B3
+    yellow_median: YELLOW
+    red_median: B4
+    rededge_median: REDEDGE
+    nir_median: B8
+    alpha_median: ALPHA
+  VIs: {"NDVI":[7, 5], 'CIre':[6, 7], 'NDRE':[6, 7]}   # vegetation indices and the band numbers to use and formula is in the script src/data/data_loader_rise.py
+  # crops_to_drop: ['Rice', 'Cassava', 'Cotton', 'Tobacco', 'Virgin', 'Sweet_Potato', 'Cowpea + Pigeon_Pea', 'Maize + Cowpea', 'Maize + Pigeon_Pea', 'Cowpea', 'Pigeon_Pea']
+  # 'Maize + Pigeon_Pea', 'Maize + Cowpea', 'Maize + Groundnut', 'Maize + Soybean', 'Cowpea + Pigeon_Pea'
+  crops_to_drop: ['', 'Rice', 'Fallow', 'Irish_Potato', 'Pigeon_Pea', 'Potato', 'Pumpkin', 'Cowpea', 'Cassava', 'Cotton', 'Tobacco', 'Virgin', 'Sweet_Potato', 'Pigeon_Pea']
+  MASK_VALUE: 65535 # the mask value in your data
+  outlier_per_timestamp: false
+  normalise_strategy: "IQR"
+  resample_data: false # upsample data
+  pre_train_test_split: null
+  EXP_VER: "99" # experiment number
+  MODEL_TYPE: "fsl" # model architecture
+  model_dir_bt: null # to be specified in fine tune settings if base model needs to be loaded
+  batch_size: 256 # batch size
+  bt_epochs: 50 # epochs for base training
+  ft_epochs: 50 # epochs for fine tuning
+  min_delta: 0.0001 # min delta setting
+  patience: 20 # number of epochs after which to quit if val_loss does not decrease
+  use_pretrained_model: false # use pretrained model
+  k_shot_value: [1, 5, 10, 'all'] # few shot experimental settings
+  ORIGINAL_INTERVAL_DAYS: 14 # data compositing interval in days
+  TARGET_INTERVAL_DAYS: 14 # desired compositing interval in days
+  
